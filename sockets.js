@@ -1,51 +1,112 @@
 const pendingInvites = {};
 
-const newConnection = (socket) => {
+const userOrders = {};
+
+const addOrderToUser = (uuid, orderId) => {
+  if (!userOrders[uuid]) {
+    userOrders[uuid] = [];
+  }
+  userOrders[uuid].push(orderId);
+};
+
+const resendLastEvent = (orderNamespace, socket, orderId) => {
+  const userRoom = socket.uuid;
+  const { lastEvent, data } = pendingInvites[orderId];
+
+  if (
+    ["client-order-canceled", "complete-order", "pickup-client"].includes(
+      lastEvent
+    )
+  ) {
+    userOrders[socket.uuid] = userOrders[socket.uuid].filter(
+      (id) => id !== orderId
+    );
+  } else {
+    orderNamespace.in(userRoom).emit(lastEvent, ...data);
+  }
+};
+
+const reJoinOrders = (orderNamespace, socket) => {
+  if (userOrders[socket.uuid]) {
+    userOrders[socket.uuid].forEach((orderId) => {
+      const orderRoom = "order" + orderId;
+      socket.join(orderRoom);
+      resendLastEvent(orderNamespace, socket, orderId);
+    });
+  }
+};
+
+const newConnection = (orderNamespace, socket) => {
   const userRoomName = socket.uuid;
+  console.log("new connection", userRoomName);
   socket.join(userRoomName);
+  reJoinOrders(orderNamespace, socket);
 };
 
 const bookRide =
   (orderNamespace, socket) => (order, driversUuids, notification) => {
     const orderRoom = "order" + order.id;
     socket.join(orderRoom);
+    addOrderToUser(socket.uuid, order.id);
     driversUuids.forEach((driverUuid) => {
-      console.log("driver uuid", driverUuid);
+      addOrderToUser(driverUuid, order.id);
       orderNamespace.in(driverUuid).emit("new-order", notification);
     });
 
-    pendingInvites[order.id] = { driversUuids, order, lastEvent: "new-order" };
+    pendingInvites[order.id] = {
+      lastEvent: "new-order",
+      data: [notification],
+    };
+
+    console.log(userOrders);
   };
 
 const receiveOrder = (socket) => (orderId) => {
   const orderRoom = "order" + orderId;
   socket.join(orderRoom);
-  pendingInvites[orderId].driversUuids = pendingInvites[
-    orderId
-  ].driversUuids.filter((uuid) => uuid !== socket.uuid);
+  userOrders[socket.uuid] = userOrders[socket.uuid].filter(
+    (id) => id !== orderId
+  );
 };
 
 const orderAccepted = (orderNamespace) => (orderId, driver) => {
   const orderRoom = "order" + orderId;
   orderNamespace.in(orderRoom).emit("order-accepted", orderId, driver);
+  pendingInvites[orderId] = {
+    lastEvent: "order-accepted",
+    data: [orderId, driver],
+  };
 };
 
 const driverCancel = (orderNamespace, socket) => (orderId) => {
   const orderRoom = "order" + orderId;
   socket.leave(orderRoom);
   orderNamespace.in(orderRoom).emit("order-canceled", orderId);
+  pendingInvites[orderId] = {
+    lastEvent: "order-canceled",
+    data: [orderId],
+  };
 };
 
 const clientCancel = (orderNamespace) => (orderId) => {
-  console.log("client cancel order", orderId);
   const orderRoom = "order" + orderId;
   orderNamespace.in(orderRoom).emit("client-order-canceled", orderId);
+
+  pendingInvites[orderId] = {
+    lastEvent: "client-order-canceled",
+    data: [orderId],
+  };
 };
 
 const complete = (orderNamespace) => (orderId, driver, fare) => {
   const orderRoom = "order" + orderId;
   orderNamespace.in(orderRoom).emit("complete-order", orderId, driver, fare);
   orderNamespace.in(orderRoom).socketsLeave(orderRoom);
+
+  pendingInvites[orderId] = {
+    lastEvent: "complete-order",
+    data: [orderId, driver, fare],
+  };
 };
 
 const pickup = (orderNamespace, socket) => (orderId, clientUuid) => {
@@ -56,15 +117,17 @@ const pickup = (orderNamespace, socket) => (orderId, clientUuid) => {
     .fetchSockets()
     .then((sockets) => {
       sockets.forEach((_s) => {
-        /**
-         * change 123 with client uuid
-         */
-        if (_s.uuid !== socket.uuid && _s.uuid !== "123") {
+        if (_s.uuid !== socket.uuid && _s.uuid !== clientUuid) {
           _s.leave(orderRoom);
         }
       });
       orderNamespace.in(orderRoom).emit("pickup-client", orderId);
     });
+
+  pendingInvites[orderId] = {
+    lastEvent: "pickup-client",
+    data: [orderId],
+  };
 };
 
 function listen(io) {
@@ -81,7 +144,7 @@ function listen(io) {
   });
 
   orderNamespace.on("connection", (socket) => {
-    newConnection(socket);
+    newConnection(orderNamespace, socket);
 
     socket.on("book-ride", bookRide(orderNamespace, socket));
 
@@ -97,8 +160,13 @@ function listen(io) {
 
     socket.on("complete", complete(orderNamespace));
 
+    socket.on("online", () => {
+      console.log("online", socket.uuid);
+      socket.join(socket.uuid);
+    });
+
     socket.on("disconnect", (reason) => {
-      console.log(`Client ${socket.id} disconnected: ${reason}`);
+      console.log(`Client ${socket.uuid} disconnected: ${reason}`);
     });
   });
 }

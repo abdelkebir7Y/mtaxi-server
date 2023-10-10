@@ -13,6 +13,10 @@ const resendLastEvent = (orderNamespace, socket, orderId) => {
   const userRoom = socket.uuid;
   const { lastEvent, data } = pendingInvites[orderId];
 
+  orderNamespace.in(userRoom).emit(lastEvent, ...data);
+
+  console.log("resend", lastEvent, data);
+
   if (
     ["client-order-canceled", "complete-order", "pickup-client"].includes(
       lastEvent
@@ -21,14 +25,14 @@ const resendLastEvent = (orderNamespace, socket, orderId) => {
     userOrders[socket.uuid] = userOrders[socket.uuid].filter(
       (id) => id !== orderId
     );
-  } else {
-    orderNamespace.in(userRoom).emit(lastEvent, ...data);
   }
 };
 
 const reJoinOrders = (orderNamespace, socket) => {
+  console.log("rejoin", userOrders[socket.uuid]);
   if (userOrders[socket.uuid]) {
     userOrders[socket.uuid].forEach((orderId) => {
+      console.log("rejoin", orderId);
       const orderRoom = "order" + orderId;
       socket.join(orderRoom);
       resendLastEvent(orderNamespace, socket, orderId);
@@ -64,9 +68,6 @@ const bookRide =
 const receiveOrder = (socket) => (orderId) => {
   const orderRoom = "order" + orderId;
   socket.join(orderRoom);
-  userOrders[socket.uuid] = userOrders[socket.uuid].filter(
-    (id) => id !== orderId
-  );
 };
 
 const orderAccepted = (orderNamespace) => (orderId, driver) => {

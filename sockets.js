@@ -17,25 +17,29 @@ const resendLastEvent = (orderNamespace, socket, orderId) => {
 
   console.log("resend", lastEvent, data);
 
-  if (
-    ["client-order-canceled", "complete-order", "pickup-client"].includes(
-      lastEvent
-    )
-  ) {
-    userOrders[socket.uuid] = userOrders[socket.uuid].filter(
-      (id) => id !== orderId
-    );
-  }
+  // if (
+  //   ["client-order-canceled", "complete-order", "pickup-client"].includes(
+  //     lastEvent
+  //   )
+  // ) {
+  //   userOrders[socket.uuid] = userOrders[socket.uuid].filter(
+  //     (id) => id !== orderId
+  //   );
+  // }
 };
 
 const reJoinOrders = (orderNamespace, socket) => {
   console.log("rejoin", userOrders[socket.uuid]);
   if (userOrders[socket.uuid]) {
-    userOrders[socket.uuid].forEach((orderId) => {
+    userOrders[socket.uuid] = userOrders[socket.uuid].filter((orderId) => {
+      if (!pendingInvites[orderId]) {
+        return false;
+      }
       console.log("rejoin", orderId);
       const orderRoom = "order" + orderId;
       socket.join(orderRoom);
       resendLastEvent(orderNamespace, socket, orderId);
+      return true;
     });
   }
 };
@@ -119,7 +123,7 @@ const pickup = (orderNamespace, socket) => (orderId, clientUuid) => {
     .then((sockets) => {
       sockets.forEach((_s) => {
         if (_s.uuid !== socket.uuid && _s.uuid !== clientUuid) {
-          _s.leave(orderRoom);
+          leaveOrder(_s)(orderId);
         }
       });
       orderNamespace.in(orderRoom).emit("pickup-client", orderId);
@@ -129,6 +133,14 @@ const pickup = (orderNamespace, socket) => (orderId, clientUuid) => {
     lastEvent: "pickup-client",
     data: [orderId],
   };
+};
+
+const leaveOrder = (socket) => (orderId) => {
+  const orderRoom = "order" + orderId;
+  socket.leave(orderRoom);
+  userOrders[socket.uuid] = userOrders[socket.uuid].filter(
+    (id) => id !== orderId
+  );
 };
 
 function listen(io) {
@@ -160,6 +172,33 @@ function listen(io) {
     socket.on("pickup", pickup(orderNamespace, socket));
 
     socket.on("complete", complete(orderNamespace));
+
+    socket.on("leave-order", leaveOrder(socket));
+
+    socket.on("client-confirm-remove-order", (orderId) => {
+      console.log("client-confirm-remove-order", orderId);
+      if (pendingInvites[orderId].driverReceivedComplete) {
+        delete pendingInvites[orderId];
+        console.log("delete", orderId);
+      }
+      pendingInvites[orderId] = {
+        ...pendingInvites[orderId],
+        clientReceivedComplete: true,
+      };
+    });
+
+    socket.on("driver-confirm-remove-order", (orderId) => {
+      console.log("driver-confirm-remove-order", orderId);
+
+      if (pendingInvites[orderId].clientReceivedComplete) {
+        delete pendingInvites[orderId];
+        console.log("delete", orderId);
+      }
+      pendingInvites[orderId] = {
+        ...pendingInvites[orderId],
+        driverReceivedComplete: true,
+      };
+    });
 
     socket.on("online", () => {
       console.log("online", socket.uuid);

@@ -50,7 +50,7 @@ const autoCancelOrder = (orderNamespace, orderId) => {
   setTimeout(() => {
     if (
       pendingInvites[orderId] &&
-      (pendingInvites[orderId]?.lastEvent === "new-order" ||
+      (["new-order" , "order-canceled"].includes(pendingInvites[orderId]?.lastEvent) &&
         cancelCount === pendingInvites[orderId]?.cancelCount)
     ) {
       orderNamespace.in(orderRoom).emit("server-cancel-order", orderId);

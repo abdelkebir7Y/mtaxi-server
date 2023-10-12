@@ -50,8 +50,10 @@ const autoCancelOrder = (orderNamespace, orderId) => {
   setTimeout(() => {
     if (
       pendingInvites[orderId] &&
-      (["new-order" , "order-canceled"].includes(pendingInvites[orderId]?.lastEvent) &&
-        cancelCount === pendingInvites[orderId]?.cancelCount)
+      ["new-order", "order-canceled"].includes(
+        pendingInvites[orderId]?.lastEvent
+      ) &&
+      cancelCount === pendingInvites[orderId]?.cancelCount
     ) {
       orderNamespace.in(orderRoom).emit("server-cancel-order", orderId);
       console.log("server-cancel-order", orderId);
@@ -134,7 +136,6 @@ const clientCancel = (orderNamespace) => (orderId) => {
 const complete = (orderNamespace) => (orderId, driver, fare) => {
   const orderRoom = "order" + orderId;
   orderNamespace.in(orderRoom).emit("complete-order", orderId, driver, fare);
-  orderNamespace.in(orderRoom).socketsLeave(orderRoom);
 
   pendingInvites[orderId] = {
     lastEvent: "complete-order",

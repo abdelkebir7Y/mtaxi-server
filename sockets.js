@@ -13,9 +13,19 @@ const resendLastEvent = (orderNamespace, socket, orderId) => {
   const userRoom = socket.uuid;
   const { lastEvent, data = [] } = pendingInvites[orderId];
 
+  // if (!lastEvent) {
+  //   leaveOrder(socket)(orderId);
+  // } else {
   orderNamespace.in(userRoom).emit(lastEvent, ...data);
+  // }
 
-  console.log("resend", lastEvent, data);
+  console.log(
+    "resend",
+    lastEvent,
+    data,
+    pendingInvites,
+    pendingInvites[orderId]
+  );
 
   // if (
   //   ["client-order-canceled", "complete-order", "pickup-client"].includes(
@@ -121,11 +131,6 @@ const driverCancel = (orderNamespace, socket) => (orderId) => {
 const clientCancel = (orderNamespace) => (orderId) => {
   const orderRoom = "order" + orderId;
   orderNamespace.in(orderRoom).emit("client-order-canceled", orderId);
-
-  if (pendingInvites[orderId]?.lastEvent === "new-order") {
-    delete pendingInvites[orderId];
-    return;
-  }
 
   pendingInvites[orderId] = {
     lastEvent: "client-order-canceled",

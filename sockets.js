@@ -210,34 +210,34 @@ function listen(io) {
     socket.on("leave-order", leaveOrder(socket));
 
     socket.on("client-confirm-remove-order", (orderId) => {
-      console.log("client-confirm-remove-order", orderId);
-      if (pendingInvites[orderId]) {
-        if (
-          pendingInvites[orderId]?.driverReceivedComplete ||
-          pendingInvites[orderId]?.lastEvent !== "order-accepted"
-        ) {
-          delete pendingInvites[orderId];
-          console.log("delete", orderId);
-        }
-        pendingInvites[orderId] = {
-          ...pendingInvites[orderId],
-          clientReceivedComplete: true,
-        };
-      }
+      // console.log("client-confirm-remove-order", orderId);
+      // if (pendingInvites[orderId]) {
+      //   if (
+      //     pendingInvites[orderId]?.driverReceivedComplete ||
+      //     pendingInvites[orderId]?.lastEvent !== "order-accepted"
+      //   ) {
+      //     delete pendingInvites[orderId];
+      //     console.log("delete", orderId);
+      //   }
+      //   pendingInvites[orderId] = {
+      //     ...pendingInvites[orderId],
+      //     clientReceivedComplete: true,
+      //   };
+      // }
     });
 
     socket.on("driver-confirm-remove-order", (orderId) => {
-      console.log("driver-confirm-remove-order", orderId);
-      if (pendingInvites[orderId]) {
-        if (pendingInvites[orderId]?.clientReceivedComplete) {
-          delete pendingInvites[orderId];
-          console.log("delete", orderId);
-        }
-        pendingInvites[orderId] = {
-          ...pendingInvites[orderId],
-          driverReceivedComplete: true,
-        };
-      }
+      // console.log("driver-confirm-remove-order", orderId);
+      // if (pendingInvites[orderId]) {
+      //   if (pendingInvites[orderId]?.clientReceivedComplete) {
+      //     delete pendingInvites[orderId];
+      //     console.log("delete", orderId);
+      //   }
+      //   pendingInvites[orderId] = {
+      //     ...pendingInvites[orderId],
+      //     driverReceivedComplete: true,
+      //   };
+      // }
     });
 
     socket.on("online", () => {

@@ -11,7 +11,7 @@ const addOrderToUser = (uuid, orderId) => {
 
 const resendLastEvent = (orderNamespace, socket, orderId) => {
   const userRoom = socket.uuid;
-  const { lastEvent, data } = pendingInvites[orderId];
+  const { lastEvent, data = [] } = pendingInvites[orderId];
 
   orderNamespace.in(userRoom).emit(lastEvent, ...data);
 

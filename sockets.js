@@ -2,7 +2,7 @@ const userOrders = {};
 
 const orders = {};
 
-const getOrderRoom = (orderId) => getOrderRoom(orderId);
+const getOrderRoom = (orderId) => "order-" + orderId;
 
 const addOrderToUser = (uuid, orderId) => {
   if (!userOrders[uuid]) {

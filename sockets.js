@@ -165,6 +165,20 @@ const complete = (orderNamespace) => (orderId, driver, fare) => {
   };
 };
 
+const confirmReservation = (orderNamespace) => (orderId) => {
+  const orderRoom = getOrderRoom(orderId);
+  const driver = orders[orderId].driver;
+  orderNamespace.in(orderRoom).emit("reservation-confirmed", orderId, driver);
+
+  orders[orderId] = {
+    ...orders[orderId],
+    lastEvent: {
+      name: "reservation-confirmed",
+      data: [orderId, driver],
+    },
+  };
+};
+
 const leaveOrder = (socket) => (orderId) => {
   const orderRoom = getOrderRoom(orderId);
   socket.leave(orderRoom);
@@ -204,6 +218,8 @@ function listen(io) {
     socket.on("complete", complete(orderNamespace));
 
     socket.on("leave-order", leaveOrder(socket));
+
+    socket.on("confirm-reservation", confirmReservation(orderNamespace));
 
     socket.on("online", () => {
       console.log("online", socket.uuid);

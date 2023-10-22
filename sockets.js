@@ -1,14 +1,45 @@
+const { redisClient } = require("./redis-client");
+
 const userOrders = {};
 
 const orders = {};
 
 const getOrderRoom = (orderId) => "order-" + orderId;
 
+const saveOrders = async () => {
+  await redisClient.set("orders", JSON.stringify(orders));
+};
+
+const saveUserOrders = async () => {
+  await redisClient.set("userOrders", JSON.stringify(userOrders));
+};
+
+const restoreUserOrders = async () => {
+  const userOrdersStr = await redisClient.get("userOrders");
+  if (userOrdersStr) {
+    userOrders = JSON.parse(userOrdersStr);
+  }
+};
+
+const restoreOrders = async () => {
+  const ordersStr = await redisClient.get("orders");
+  if (ordersStr) {
+    orders = JSON.parse(ordersStr);
+  }
+};
+
+// on mount restore orders from redis
+restoreOrders();
+
+// on mount restore userOrders from redis
+restoreUserOrders();
+
 const addOrderToUser = (uuid, orderId) => {
   if (!userOrders[uuid]) {
     userOrders[uuid] = [];
   }
   userOrders[uuid].push(orderId);
+  saveUserOrders();
 };
 
 const reJoinOrders = (socket) => {
@@ -25,6 +56,7 @@ const reJoinOrders = (socket) => {
       );
       const orderRoom = getOrderRoom(orderId);
       socket.join(orderRoom);
+      saveUserOrders();
       return true;
     });
   }
@@ -46,6 +78,7 @@ const autoCancelOrder = (orderNamespace, orderId) => {
         name: "server-cancel-order",
         data: [orderId],
       };
+      saveOrders();
     }
   }, 60000);
 };
@@ -81,6 +114,7 @@ const bookRide =
       cancelCount: 0,
     };
 
+    saveOrders();
     autoCancelOrder(orderNamespace, order.id);
   };
 
@@ -94,6 +128,7 @@ const receiveOrder = (socket) => (orderId) => {
     ...orders[orderId],
     driversUuids,
   };
+  saveOrders();
 };
 
 const orderAccepted = (orderNamespace) => (orderId, driver) => {
@@ -107,6 +142,7 @@ const orderAccepted = (orderNamespace) => (orderId, driver) => {
       data: [orderId, driver],
     },
   };
+  saveOrders();
 };
 
 const driverCancel = (orderNamespace) => (orderId) => {
@@ -123,6 +159,7 @@ const driverCancel = (orderNamespace) => (orderId) => {
     cancelCount: orders[orderId].cancelCount + 1,
   };
   autoCancelOrder(orderNamespace, orderId);
+  saveOrders();
 };
 
 const clientCancel = (orderNamespace) => (orderId) => {
@@ -136,6 +173,7 @@ const clientCancel = (orderNamespace) => (orderId) => {
       data: [orderId],
     },
   };
+  saveOrders();
 };
 
 const pickup = (orderNamespace) => (orderId) => {
@@ -150,6 +188,7 @@ const pickup = (orderNamespace) => (orderId) => {
       data: [orderId, driver],
     },
   };
+  saveOrders();
 };
 
 const complete = (orderNamespace) => (orderId, driver, fare) => {
@@ -163,6 +202,7 @@ const complete = (orderNamespace) => (orderId, driver, fare) => {
       data: [orderId, driver, fare],
     },
   };
+  saveOrders();
 };
 
 const confirmReservation = (orderNamespace) => (orderId) => {
@@ -177,6 +217,7 @@ const confirmReservation = (orderNamespace) => (orderId) => {
       data: [orderId, driver],
     },
   };
+  saveOrders();
 };
 
 const leaveOrder = (socket) => (orderId) => {
@@ -185,6 +226,7 @@ const leaveOrder = (socket) => (orderId) => {
   userOrders[socket.uuid] = userOrders[socket.uuid].filter(
     (id) => id !== orderId
   );
+  saveUserOrders();
 };
 
 function listen(io) {

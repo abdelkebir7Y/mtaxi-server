@@ -164,13 +164,14 @@ const driverCancel = (orderNamespace) => (orderId) => {
 
 const clientCancel = (orderNamespace) => (orderId) => {
   const orderRoom = getOrderRoom(orderId);
-  orderNamespace.in(orderRoom).emit("client-order-canceled", orderId);
+  const driver = orders[orderId].driver;
+  orderNamespace.in(orderRoom).emit("client-order-canceled", orderId, driver);
 
   orders[orderId] = {
     ...orders[orderId],
     lastEvent: {
       name: "client-order-canceled",
-      data: [orderId],
+      data: [orderId, driver],
     },
   };
   saveOrders();

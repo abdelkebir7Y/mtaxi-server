@@ -65,6 +65,7 @@ const reJoinOrders = (socket) => {
 const autoCancelOrder = (orderNamespace, orderId) => {
   const orderRoom = getOrderRoom(orderId);
   const cancelCount = orders[orderId]?.cancelCount;
+  const driver = orders[orderId]?.driver;
   setTimeout(() => {
     if (
       orders[orderId] &&
@@ -73,10 +74,10 @@ const autoCancelOrder = (orderNamespace, orderId) => {
       ) &&
       cancelCount === orders[orderId].cancelCount
     ) {
-      orderNamespace.in(orderRoom).emit("server-cancel-order", orderId);
+      orderNamespace.in(orderRoom).emit("server-cancel-order", orderId, driver);
       orders[orderId].lastEvent = {
         name: "server-cancel-order",
-        data: [orderId],
+        data: [orderId, driver],
       };
       saveOrders();
     }

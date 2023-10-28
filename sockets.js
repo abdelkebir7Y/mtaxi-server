@@ -1,8 +1,8 @@
 const { redisClient } = require("./redis-client");
 
-const userOrders = {};
+let userOrders = {};
 
-const orders = {};
+let orders = {};
 
 const getOrderRoom = (orderId) => "order-" + orderId;
 

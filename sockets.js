@@ -44,20 +44,41 @@ const addOrderToUser = (uuid, orderId) => {
 
 const reJoinOrders = (socket) => {
   if (userOrders[socket.uuid]) {
-    userOrders[socket.uuid] = userOrders[socket.uuid].filter((orderId) => {
-      console.log("rejoin", orderId);
+    userOrders[socket.uuid].forEach((orderId) => {
+      if (orders[orderId]) {
+        const isClient = socket.uuid === orders[orderId].client?.uuid; // client-uuid
+        const isDriver = socket.uuid === orders[orderId].driver?.uuid; // driver-uuid - driver can be null
+        const lastEventName = orders[orderId].lastEvent?.name;
+        const orderRoom = getOrderRoom(orderId);
 
-      if (orders[orderId].driversUuids.includes(socket.uuid)) {
-        socket.emit("new-order", orders[orderId].notification);
+        console.log({ rejoin: orderId, isClient, isDriver });
+
+        if (isClient || isDriver) {
+          socket.emit(
+            orders[orderId].lastEvent.name,
+            ...orders[orderId].lastEvent.data
+          );
+          socket.join(orderRoom);
+        } else {
+          if (
+            ["new-order", "order-accepted", "order-canceled"].includes(
+              lastEventName
+            )
+          ) {
+            if (orders[orderId].driversUuids.includes(socket.uuid)) {
+              socket.emit("new-order", orders[orderId].notification);
+            }
+
+            socket.emit(
+              orders[orderId].lastEvent.name,
+              ...orders[orderId].lastEvent.data
+            );
+            socket.join(orderRoom);
+          } else {
+            leaveOrder(socket)(orderId);
+          }
+        }
       }
-      socket.emit(
-        orders[orderId].lastEvent.name,
-        ...orders[orderId].lastEvent.data
-      );
-      const orderRoom = getOrderRoom(orderId);
-      socket.join(orderRoom);
-      saveUserOrders();
-      return true;
     });
   }
 };
@@ -65,7 +86,6 @@ const reJoinOrders = (socket) => {
 const autoCancelOrder = (orderNamespace, orderId) => {
   const orderRoom = getOrderRoom(orderId);
   const cancelCount = orders[orderId]?.cancelCount;
-  const driver = orders[orderId]?.driver;
   setTimeout(() => {
     if (
       orders[orderId] &&
@@ -74,10 +94,10 @@ const autoCancelOrder = (orderNamespace, orderId) => {
       ) &&
       cancelCount === orders[orderId].cancelCount
     ) {
-      orderNamespace.in(orderRoom).emit("server-cancel-order", orderId, driver);
+      orderNamespace.in(orderRoom).emit("server-cancel-order", orderId);
       orders[orderId].lastEvent = {
         name: "server-cancel-order",
-        data: [orderId, driver],
+        data: [orderId],
       };
       saveOrders();
     }

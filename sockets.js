@@ -152,15 +152,15 @@ const receiveOrder = (socket) => (orderId) => {
   saveOrders();
 };
 
-const orderAccepted = (orderNamespace) => (orderId, driver) => {
+const orderAccepted = (orderNamespace) => (orderId, driver, vehicle) => {
   const orderRoom = getOrderRoom(orderId);
-  orderNamespace.in(orderRoom).emit("order-accepted", orderId, driver);
+  orderNamespace.in(orderRoom).emit("order-accepted", orderId, driver, vehicle);
   orders[orderId] = {
     ...orders[orderId],
     driver,
     lastEvent: {
       name: "order-accepted",
-      data: [orderId, driver],
+      data: [orderId, driver, vehicle],
     },
   };
   saveOrders();
